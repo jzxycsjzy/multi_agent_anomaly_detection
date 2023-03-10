@@ -12,6 +12,9 @@ from drain3.template_miner import TemplateMiner
 from drain3.template_miner_config import TemplateMinerConfig
 from drain3.persistence_handler import PersistenceHandler
 
+# Import Graph class
+from TraceGraph import TraceGraph
+
 data_dir = "../data/"
 
 def Drain_Init():
@@ -48,16 +51,62 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
     log_lines = log_f.readlines()
     log_f.close()
 
+    # for i in range(len(log_lines)):
+    #     if not i < len(log_lines):
+    #         break
+    #     line = log_lines[i]
+    #     log_timestamp, trace_id, span_id, unstructure = LogLineSplit(line)
+    #     print(log_timestamp)
+    #     exit()
+
     for trace_file in trace_list:
         trace_lines = pd.read_csv(trace_file)
-        trace_id = ""
+        logs = pd.DataFrame([], columns=['traceid', 'spanid', 'parentspan', 'childspans', 'loginfo'])
+        # logs.loc[logs.shape[0]] = ["a001", "a001.1", '-', ['a001.2', 'a001.3'], ['abc', 'def']]
+        # print(type(logs))
+        # print(type(logs.loc[0]))
+        # a = logs.loc[0]
+        # print(a['log_info'])
+        # exit()
+        current_trace = ""
+        # Trace log list
+        trace_logs = []
+        # Store all span data
+        spans = []
         count = 0
-        logs = pd.DataFrame([], columns=['traceid', 'index', 'spanid', 'parentspanid', 'loginfo'])
-        logs.loc[logs.shape[0]] = [0,1,2,3,4]
-        print(logs)
         for i in tqdm(range(trace_lines.shape[0])):
-            line = trace_lines.loc[i]
-            
+            trace_line = trace_lines.loc[i]
+            # Find a new trace
+            if trace_line['TraceId'] != current_trace:
+                count += 1
+                logs.loc[logs.shape[0]] = trace_logs
+                if count == 2:
+                    break
+                current_trace = trace_line['TraceId']
+                trace_logs.clear()
+                remove_logs = []
+                for j in range(len(log_lines)):
+                    log_line = log_lines[j]
+                    # timestamp, traceid, spanid, infos
+                    structured_log = LogLineSplit(log_line)
+                    if current_trace == trace_line['TraceId']:
+                        trace_logs.append(structured_log)
+                        remove_logs.append(log_line)
+                # Logs will be remove from the log list after they have been processed.
+                for line in remove_logs:
+                    log_lines.remove(line)
+            # Existing trace, new span
+            # Process Trace and logs, then create trace event graph(TEG)
+            # print(trace_logs)
+            span_node = TraceGraph(trace_line['TraceId'], trace_line['SpanId'], trace_line['ParentSpan'])
+            for log_dt in trace_logs:
+                cur_span_id = trace_line['SpanId'][:-2]
+                cur_start_time = trace_line['StartTime']
+                cur_end_time = trace_line['EndTime']
+                if log_dt[0] <= cur_end_time and log_dt[0] >= cur_start_time:
+                    span_node.log_info.append(log_dt[3])
+            spans.append(span_node)
+        print(logs)
         exit()
 
 
@@ -114,9 +163,24 @@ def Time2Timestamp(timestr: str):
     return timestamp
 
 def LogLineSplit(logline: str):
-    pass
+    infos = logline.split(' ')
+    log_time = ' '.join(infos[0:2])
+    log_timestamp = Time2Timestamp(log_time)
+
+
+    cache = infos[2][9:-2].split(',')
+    service_name = cache[0]
+    trace_id = cache[2]
+    span_id = cache[3]
+
+    # serverity = infos[4]
+    unstructure = ' '.join(infos[5:])
+    return [log_timestamp, trace_id, span_id, unstructure]
+    
 
 if __name__ == '__main__':
     WorkFlow()
+    test = pd.read_csv("test.csv")
+    print(test)
     pass
 

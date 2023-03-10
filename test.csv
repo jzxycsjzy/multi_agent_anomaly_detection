@@ -1,0 +1,2 @@
+,traceid,spanid,parent_span,child_spans,log_info
+0,a001,a001.1,-,"['a001.2', 'a001.3']","['abc', 'def']"
