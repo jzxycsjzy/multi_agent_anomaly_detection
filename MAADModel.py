@@ -2,6 +2,7 @@
 import os
 import numpy as np
 import time
+from tqdm import tqdm
 
 # Neural network lib
 import torch
@@ -34,13 +35,13 @@ def model_test():
     optimizer = torch.optim.Adam(lr=0.003, params=model.parameters())
     optimizer.zero_grad()
     start_time = time.time()
-    for i in range(1000):
+    for i in tqdm(range(1000)):
         a = torch.rand([1,1,50], dtype=torch.float32)
         out = model(a)
-        loss = torch.sum(out, dim=2) - torch.ones([1,1], dtype=torch.float32)
-        loss.backward()
-        print("loss:{}".format(loss))
-        optimizer.step()
+        # loss = torch.sum(out, dim=2) - torch.ones([1,1], dtype=torch.float32)
+        # loss.backward()
+        # print("loss:{}".format(loss))
+        # optimizer.step()
         
     end_time = time.time()
     time_consuming = end_time - start_time
