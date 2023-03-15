@@ -1,2 +1,5 @@
-/data
-/__pacache__
+data
+__pycache__
+GloVe
+SIF
+DrainModel
