@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import sys
 import time
@@ -12,12 +14,15 @@ from drain3.template_miner import TemplateMiner
 from drain3.template_miner_config import TemplateMinerConfig
 from drain3.persistence_handler import PersistenceHandler
 
-# Import Graph class
-from TraceGraph import TraceGraph
+# # Import Graph class
+# from TraceGraph import TraceGraph
+
+# Import NLP model
+from SIF import params, data_io, SIF_embedding
 
 data_dir = "../data/"
 
-def Drain_Init():
+def Drain_Init() -> TemplateMiner:
     """
     Create drain3 model
     """
@@ -47,9 +52,18 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
     """         
     print("######################")
     print(trace_list, log_file, tgt_file)
+    with open("finished_log.txt", 'r') as f:
+        lines = f.readlines()
+    for line in lines:
+        if line.strip() == log_file:
+            return
     log_f = open(log_file, 'r')
     log_lines = log_f.readlines()
     log_f.close()
+
+    # Load Drain model
+    if os.path.exists("DrainModel/tt"):
+        tmp.load_state("tt")
 
     logs = pd.DataFrame([], columns=['traceid', 'spanid', 'parentspan', 'childspans', 'service', 'loginfo'])
     current_trace = ""
@@ -64,6 +78,7 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
         # print(a['log_info'])
         # exit()
         # Store all span data
+        count_record = 0
         span_record = {'traceid':[], 'spanid':[], 'parentspan':[], 'childspans':[], 'service':[], 'loginfo':[]}
         for i in tqdm(range(trace_lines.shape[0])):
             trace_line = trace_lines.loc[i]
@@ -72,7 +87,7 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
                 current_trace = trace_line['TraceId']
                 if len(span_record['traceid']) != 0:
                     for index in range(len(span_record['traceid'])):
-                        if span_record['parentspan'][index] == '-1':
+                        if span_record['parentspan'][index] == '-1' or span_record['parentspan'][index] == -1:
                             continue
                         span_record['childspans'][span_record['spanid'].index(span_record['parentspan'][index])].append(span_record['spanid'][index])
                     # save to dataframe
@@ -113,15 +128,16 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
                 cur_span_id = trace_line['SpanId'][:-2]
                 cur_start_time = trace_line['StartTime']
                 cur_end_time = trace_line['EndTime']
-                if log_dt[0] <= cur_end_time and log_dt[0] >= cur_start_time:
-                    span_record['loginfo'][-1].append(log_dt)
+                if log_dt[3] == cur_span_id:
+                    if log_dt[0] <= cur_end_time and log_dt[0] >= cur_start_time:
+                        span_record['loginfo'][-1].append(log_dt)
                 # Mine drain template
-                tmp.add_log_message(log_dt[2])
+                tmp.add_log_message(log_dt[2].strip())
 
             # Bound processing
             if i == trace_lines.shape[0] - 1 and trace_line['ParentSpan'] != "-1":
                 for index in range(len(span_record['traceid'])):
-                    if span_record['parentspan'][index] == '-1':
+                    if span_record['parentspan'][index] == '-1' or span_record['parentspan'][index] == -1:
                         continue
                     span_record['childspans'][span_record['spanid'].index(span_record['parentspan'][index])].append(span_record['spanid'][index])
                 # save to dataframe
@@ -133,6 +149,9 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
             logs = pd.concat([cache, logs], axis=0)
         logs.to_csv(tgt_file, index = False)
         tmp.save_state("tt")
+
+    with open("finished_log.txt", 'a+') as f:
+        f.write(log_file + "\n")
 
 
 
@@ -188,11 +207,12 @@ def Time2Timestamp(timestr: str):
     return timestamp
 
 def LogLineSplit(logline: str):
+    """
+    Format the log line data and return some useful data
+    """
     infos = logline.split(' ')
     log_time = ' '.join(infos[0:2])
     log_timestamp = Time2Timestamp(log_time)
-
-
     cache = infos[2][9:-2].split(',')
     service_name = cache[0]
     trace_id = cache[2]
@@ -200,12 +220,44 @@ def LogLineSplit(logline: str):
 
     # serverity = infos[4]
     unstructure = ' '.join(infos[5:])
-    return [log_timestamp, trace_id, unstructure]
+    return [log_timestamp, trace_id, unstructure, span_id]
+
+def GloveCorpusConstruction():
+    """
+    Generate world vector from templates
+    """
+    save_dir = "data/glove/corpus"
+    tmp = Drain_Init()
+    tmp.load_state("tt")
+    save_file = open(save_dir, 'a+')
+    for cluster in tmp.drain.clusters:
+        template = cluster.get_template()
+        save_file.write(RemoveSignals(template))
+    save_file.close()
+
+def RemoveSignals(line: str):
+    """
+    Remove all signals, numbers and single alpha from log line
+    """
+    remove_list = list("~`!@#$%^&*()-_=+[{]};:'\",<.>/?|\\0123456789")
+    res = line
+    for signal in remove_list:
+        res = res.replace(signal, ' ')
+    res_list = res.split()
+    alpha = "abcdefghijklmnopqrstuvwxyz"
+    alpha_upper = alpha.upper()
+    alpha_lower = alpha.lower()
+    alpha_list = list(alpha_upper + alpha_lower)
+    for a in alpha_list:
+        while a in res_list:
+            res_list.remove(a)
+    res = ' '.join(res_list)
+    return res
     
 
 if __name__ == '__main__':
-    WorkFlow()
-    test = pd.read_csv("test.csv")
-    print(test)
-    pass
+    # TraceLogCombine(Drain_Init(), ['/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F12-05/ERROR_SpanData2021-08-12_16-49-08.csv'], '/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F12-05/raw_log2021-08-12_16-49-39.log', "test.csv")
+    # WorkFlow()
+    GloveCorpusConstruction()
+    
 
