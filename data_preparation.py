@@ -17,10 +17,24 @@ from drain3.persistence_handler import PersistenceHandler
 # # Import Graph class
 # from TraceGraph import TraceGraph
 
-# Import NLP model
-from SIF import params, data_io, SIF_embedding
+# # Import NLP model
+# from SIF import params, data_io, SIF_embedding
 
-data_dir = "../data/"
+# # Init SIF parameters
+# wordfile = "data/glove/vectors.txt" # word vector file, can be downloaded from GloVe website
+# weightfile = "data/glove/vocab.txt" # each line is a word and its frequency
+# weightpara = 1e-3 # the parameter in the SIF weighting scheme, usually in the range [3e-5, 3e-3]
+# rmpc = 1 # number of principal components to remove in SIF weighting scheme
+# # load word vectors
+# (words, We) = data_io.getWordmap(wordfile)
+# # load word weights
+# word2weight = data_io.getWordWeight(weightfile, weightpara) # word2weight['str'] is the weight for the word 'str'
+# weight4ind = data_io.getWeight(words, word2weight) # weight4ind[i] is the weight for the i-th word
+# # set parameters
+# param = params.params()
+# param.rmpc = rmpc
+
+
 
 def Drain_Init() -> TemplateMiner:
     """
@@ -52,11 +66,11 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
     """         
     print("######################")
     print(trace_list, log_file, tgt_file)
-    with open("finished_log.txt", 'r') as f:
-        lines = f.readlines()
-    for line in lines:
-        if line.strip() == log_file:
-            return
+    # with open("finished_log.txt", 'r') as f:
+    #     lines = f.readlines()
+    # for line in lines:
+    #     if line.strip() == log_file:
+    #         return
     log_f = open(log_file, 'r')
     log_lines = log_f.readlines()
     log_f.close()
@@ -148,7 +162,7 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
             cache = pd.read_csv(tgt_file)
             logs = pd.concat([cache, logs], axis=0)
         logs.to_csv(tgt_file, index = False)
-        tmp.save_state("tt")
+        # tmp.save_state("tt")
 
     with open("finished_log.txt", 'a+') as f:
         f.write(log_file + "\n")
@@ -256,8 +270,8 @@ def RemoveSignals(line: str):
     
 
 if __name__ == '__main__':
-    # TraceLogCombine(Drain_Init(), ['/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F12-05/ERROR_SpanData2021-08-12_16-49-08.csv'], '/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F12-05/raw_log2021-08-12_16-49-39.log', "test.csv")
+    TraceLogCombine(Drain_Init(), ['/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/SUCCESSF0101_SpanData2021-08-14_10-22-48.csv'], '/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/F0101raw_log2021-08-14_10-22-51.log', "test.csv")
     # WorkFlow()
-    GloveCorpusConstruction()
+    # GloveCorpusConstruction()
     
 

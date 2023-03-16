@@ -3,4 +3,8 @@ __pycache__
 GloVe
 SIF
 DrainModel
-DrainModel/tt
+models
+loss.png
+ResultVisualization.py
+test.csv
+log.txt
