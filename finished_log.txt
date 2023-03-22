@@ -59,3 +59,5 @@
 ./data/DeepTraLog/TraceLogData/normal/F02-04-normal/raw_log.log
 /home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F12-05/raw_log2021-08-12_16-49-39.log
 /home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/F0101raw_log2021-08-14_10-22-51.log
+./data/DeepTraLog/TraceLogData/normal/normal0730data/raw_log2021-07-30_17-00-08.log
+./data/DeepTraLog/TraceLogData/normal/normal0809_03/raw_log2021-08-10_12-10-15.log

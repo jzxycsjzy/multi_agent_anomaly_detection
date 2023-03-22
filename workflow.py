@@ -11,7 +11,7 @@ import pandas as pd
 #Import torch
 import torch
 
-from memory_profiler import profile
+# from memory_profiler import profile
 
 from drain3 import TemplateMiner
 from MAADModel import MAADModel
@@ -40,6 +40,8 @@ param.rmpc = rmpc
 # Set loss function
 loss_func = torch.nn.CrossEntropyLoss()
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 def Init_model() -> Tuple[dict[str: MAADModel], dict[str: torch.optim.Adam]]:
     """
@@ -50,9 +52,11 @@ def Init_model() -> Tuple[dict[str: MAADModel], dict[str: torch.optim.Adam]]:
     service_list = pd.read_csv("id_service.csv").drop(labels="Unnamed: 0", axis=1)
     # service_list = service_list.sample(frac=1).reset_index(drop=True)
     # print(service_list.loc[0])
-    for i in range(service_list.shape[0]):
+    for i in tqdm(range(service_list.shape[0])):
         service = service_list.loc[i]["Service"]
         model_list[service] = MAADModel()
+        # model_list[service].to(device)
+        # model_list[service].load_state_dict(torch.load("./models/Model_02_lr1e-4/" + service + ".pt"))
         optimizer_list[service] = torch.optim.Adam(lr=0.001, params=model_list[service].parameters())
         optimizer_list[service].zero_grad()
     return model_list, optimizer_list
@@ -80,7 +84,6 @@ def Sample(models: dict[str: MAADModel], optimizers: dict[str: torch.optim.Adam]
             for i in range(15):
                 if pds[i].shape[0] > steps[i]:
                     status = False
-                    
                     break
             if status:
                 steps = [0] * 15
@@ -103,10 +106,88 @@ def Sample(models: dict[str: MAADModel], optimizers: dict[str: torch.optim.Adam]
                             count = 0
                             if traces % 100 == 0:
                                 for service in models.keys():
-                                    torch.save(models[service].state_dict(), './models/' + service + '.pt')
+                                    torch.save(models[service].state_dict(), './models/Model03/' + service + '.pt')
                             break
                     end_index = steps[i]
                     steps[i] += 1
+
+# def WorkTrace(models: dict[str: MAADModel], optimizers: dict[str: torch.optim.Adam], pd: pd.DataFrame, fault_list: dict, tmp: TemplateMiner, fault_type: int):
+#     pd = pd.reset_index(drop=True)
+#     start_log = pd.loc[0]['loginfo']
+#     cur_vectors = Logs2Vectors(start_log, tmp=tmp)
+#     cur_service = pd.loc[0]['service']
+#     print(fault_list[fault_type], pd.loc[0]['traceid'])
+#     cur_out = None
+#     cur_category = None
+#     has_cal = False
+#     res = False
+#     if len(cur_vectors) != 0:
+#         cur_tensor = torch.tensor(cur_vectors, dtype=torch.float32)
+#         cur_tensor = cur_tensor.unsqueeze(0).unsqueeze(0)
+#     else:
+#         cur_tensor = torch.zeros([1,1,1,50], dtype=torch.float32)
+#         has_cal = True
+#     #cuda = next(models[cur_service].parameters()).device
+#     #cur_tensor = cur_tensor.to(cuda)
+#     cur_out, category = models[cur_service](cur_tensor)
+#     has_cal = True
+
+#     cur_childs = eval(pd.loc[0]['childspans'])
+#     if len(cur_childs) != 0:
+#         for child in cur_childs:
+#             child_series = pd[pd['spanid'] == child].reset_index(drop=True)
+#             res = WorkForward(models=models, optimizers=optimizers, pd=pd, fault_list=fault_list, tmp=tmp, cur_logs=child_series.loc[0]['loginfo'], childs=child_series.loc[0]['childspans'], cur_service=cur_service, fault_type=fault_type, prev_out=cur_out)
+#     if has_cal == True and res == False:
+#         if cur_category == None:
+#             return
+#         # It could represent that this span has come to end. Calculate the loss and backward
+#         tgt = torch.tensor([fault_type], dtype=torch.long)
+#         #tgt = tgt.to(cuda)
+#         loss = loss_func(category, tgt)
+#         loss.backward(retain_graph=True)
+#         for service in optimizers.keys():
+#             optimizers[service].step()
+#             optimizers[service].zero_grad()
+#         print(loss)
+
+
+# def WorkForward(models: dict[str: MAADModel], optimizers: dict[str: torch.optim.Adam],  pd: pd.DataFrame, fault_list: dict, tmp: TemplateMiner, cur_logs: list, childs: list, cur_service: str, fault_type: int, prev_out: torch.tensor) -> bool:
+#     cur_vectors = Logs2Vectors(cur_logs=cur_logs, tmp=tmp)
+#     cur_out = prev_out
+
+#     has_cal = False
+#     res = False
+#     if len(cur_vectors) != 0:
+#         cur_tensor = torch.tensor(cur_vectors, dtype=torch.float32)
+#         cur_tensor = cur_tensor.unsqueeze(0).unsqueeze(0)
+#         cur_tensor = torch.cat([prev_out, cur_tensor], dim=2)
+#     else:
+#         cache = torch.zeros([1,1,1,50], dtype=torch.float32)
+#         #cache = cache.to(device)
+#         cur_tensor = torch.cat([cur_out, cache], dim=2)
+#     #cuda = next(models[cur_service].parameters()).device
+#     #cur_tensor = cur_tensor.to(cuda)
+#     cur_out, category = models[cur_service](cur_tensor)
+#     has_cal = True
+
+#     cur_childs = eval(childs)
+#     if len(cur_childs) != 0:
+#         for child in cur_childs:
+#             child_series = pd[pd['spanid'] == child].reset_index(drop=True)
+#             res = WorkForward(models=models, optimizers=optimizers, pd=pd, fault_list=fault_list, tmp=tmp, cur_logs=child_series.loc[0]['loginfo'], childs=child_series.loc[0]['childspans'], cur_service=cur_service, fault_type=fault_type, prev_out=cur_out)
+#     if has_cal == True and res == False:
+#         # It could represent that this span has come to end. Calculate the loss and backward
+#         tgt = torch.tensor([fault_type], dtype=torch.long)
+#         #tgt = tgt.to(cuda)
+#         loss = loss_func(category, tgt)
+#         loss.backward(retain_graph=True)
+#         for service in optimizers.keys():
+#             optimizers[service].step()
+#             optimizers[service].zero_grad()
+#         print(loss)
+#         has_cal = True
+
+#     return has_cal
 
 def WorkTrace(models: dict[str: MAADModel], optimizers: dict[str: torch.optim.Adam], pd: pd.DataFrame, fault_list: dict, tmp: TemplateMiner, fault_type: int):
     pd = pd.reset_index(drop=True)

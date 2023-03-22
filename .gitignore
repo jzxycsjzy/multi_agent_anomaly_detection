@@ -6,5 +6,7 @@ DrainModel
 models
 loss.png
 ResultVisualization.py
-test.csv
+*.csv
 log.txt
+loss_pngs
+*.txt

@@ -79,9 +79,10 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
     if os.path.exists("DrainModel/tt"):
         tmp.load_state("tt")
 
-    logs = pd.DataFrame([], columns=['traceid', 'spanid', 'parentspan', 'childspans', 'service', 'loginfo'])
+    logs = pd.DataFrame([], columns=['traceid', 'spanid', 'parentspan', 'childspans', 'service', 'loginfo', 'spaninfo'])
     current_trace = ""
     trace_logs = []
+    
 
     for trace_file in trace_list:
         trace_lines = pd.read_csv(trace_file)
@@ -92,8 +93,8 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
         # print(a['log_info'])
         # exit()
         # Store all span data
-        count_record = 0
-        span_record = {'traceid':[], 'spanid':[], 'parentspan':[], 'childspans':[], 'service':[], 'loginfo':[]}
+        tgt_file = tgt_file.replace('test', 'train')
+        span_record = {'traceid':[], 'spanid':[], 'parentspan':[], 'childspans':[], 'service':[], 'loginfo':[], 'spaninfo':[]}
         for i in tqdm(range(trace_lines.shape[0])):
             trace_line = trace_lines.loc[i]
             # Find a new trace
@@ -114,19 +115,26 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
                     span_record['childspans'].clear()
                     span_record['loginfo'].clear()
                     span_record['service'].clear()
+                    span_record['spaninfo'].clear()
                     trace_logs.clear()
-                    remove_logs = []
+                    if i > trace_lines.shape[0] * 0.7 and 'test' not in tgt_file:
+                        logs.to_csv(tgt_file, index=False)
+                        tgt_file = tgt_file.replace('train', 'test')
+                        logs = pd.DataFrame([], columns=['traceid', 'spanid', 'parentspan', 'childspans', 'service', 'loginfo', 'spaninfo'])
+                remove_logs = []
 
-                    for j in range(len(log_lines)):
-                        log_line = log_lines[j]
-                        # timestamp, traceid, spanid, infos
-                        structured_log = LogLineSplit(log_line)
-                        if current_trace == structured_log[1]:
-                            trace_logs.append(structured_log)
-                            remove_logs.append(log_line)
-                    # Logs will be remove from the log list after they have been processed.
-                    for line in remove_logs:
-                        log_lines.remove(line)
+                for j in range(len(log_lines)):
+                    log_line = log_lines[j]
+                    # timestamp, traceid, spanid, infos
+                    structured_log = LogLineSplit(log_line)
+                    if current_trace == structured_log[1]:
+                        trace_logs.append(structured_log)
+                        remove_logs.append(log_line)
+                # Logs will be remove from the log list after they have been processed.
+                for line in remove_logs:
+                    log_lines.remove(line)
+                
+                
             # Existing trace, new span
             # Process Trace and logs, then create trace event graph(TEG)
             # print(trace_logs)
@@ -137,6 +145,7 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
             span_record['childspans'].append([])
             span_record['service'].append(trace_line['Service'])
             span_record['loginfo'].append([])
+            span_record['spaninfo'].append(trace_line['URL'])
             # span_node = TraceGraph(trace_line['TraceId'], trace_line['SpanId'], trace_line['ParentSpan'])
             for log_dt in trace_logs:
                 cur_span_id = trace_line['SpanId'][:-2]
@@ -147,6 +156,7 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
                         span_record['loginfo'][-1].append(log_dt)
                 # Mine drain template
                 tmp.add_log_message(log_dt[2].strip())
+                tmp.add_log_message(trace_line['URL'])
 
             # Bound processing
             if i == trace_lines.shape[0] - 1 and trace_line['ParentSpan'] != "-1":
@@ -158,13 +168,15 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
                 out = pd.DataFrame(span_record)
                 logs = pd.concat([logs, out], axis=0)
 
+
         if os.path.exists(tgt_file):
             cache = pd.read_csv(tgt_file)
             logs = pd.concat([cache, logs], axis=0)
+        print(tgt_file)
         logs.to_csv(tgt_file, index = False)
-        # tmp.save_state("tt")
+        tmp.save_state("tt2")
 
-    with open("finished_log.txt", 'a+') as f:
+    with open("finished_log2.txt", 'a+') as f:
         f.write(log_file + "\n")
 
 
@@ -270,8 +282,8 @@ def RemoveSignals(line: str):
     
 
 if __name__ == '__main__':
-    TraceLogCombine(Drain_Init(), ['/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/SUCCESSF0101_SpanData2021-08-14_10-22-48.csv'], '/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/F0101raw_log2021-08-14_10-22-51.log', "test.csv")
-    # WorkFlow()
-    # GloveCorpusConstruction()
+    # TraceLogCombine(Drain_Init(), ['/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/SUCCESSF0101_SpanData2021-08-14_10-22-48.csv'], '/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/F0101raw_log2021-08-14_10-22-51.log', "train_F01.csv")
+    WorkFlow()
+    GloveCorpusConstruction()
     
 
