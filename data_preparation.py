@@ -3,10 +3,14 @@ from __future__ import annotations
 import os
 import sys
 import time
+# import modin
 import pandas as pd
+# import modin.pandas as pd
 import datetime
 import logging
+import random
 
+from multiprocessing import Process
 from tqdm import tqdm
 
 # Import drain3 model
@@ -14,6 +18,8 @@ from drain3.template_miner import TemplateMiner
 from drain3.template_miner_config import TemplateMinerConfig
 from drain3.persistence_handler import PersistenceHandler
 
+# import modin.config as modin_cfg
+# import ray
 # # Import Graph class
 # from TraceGraph import TraceGraph
 
@@ -66,11 +72,11 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
     """         
     print("######################")
     print(trace_list, log_file, tgt_file)
-    # with open("finished_log.txt", 'r') as f:
-    #     lines = f.readlines()
-    # for line in lines:
-    #     if line.strip() == log_file:
-    #         return
+    with open("finished_log2.txt", 'r') as f:
+        lines = f.readlines()
+    for line in lines:
+        if line.strip() == log_file:
+            return
     log_f = open(log_file, 'r')
     log_lines = log_f.readlines()
     log_f.close()
@@ -118,6 +124,9 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
                     span_record['spaninfo'].clear()
                     trace_logs.clear()
                     if i > trace_lines.shape[0] * 0.7 and 'test' not in tgt_file:
+                        if os.path.exists(tgt_file):
+                            cache = pd.read_csv(tgt_file)
+                            logs = pd.concat([cache, logs], axis=0)
                         logs.to_csv(tgt_file, index=False)
                         tgt_file = tgt_file.replace('train', 'test')
                         logs = pd.DataFrame([], columns=['traceid', 'spanid', 'parentspan', 'childspans', 'service', 'loginfo', 'spaninfo'])
@@ -185,18 +194,21 @@ def WorkFlow():
     """
     Data preparation work flow contorling.
     """
+    # Multi-processing init
+    process_list = []
+    parameter_list = []
     # Create drain template miner.
     drain3_template = Drain_Init()
     data_dir = "./data/DeepTraLog/TraceLogData"
-    tgt_dir = "./data/ProcessedData"
+    tgt_dir = "./data/ProcessedData2"
 
     tgt_file = ""
     # Read All data
     for f_0 in os.listdir(data_dir):
         if "F" in f_0:
-            tgt_file = f_0[:3]
+            tgt_file = "train_" + f_0[:3]
         else:
-            tgt_file = "normal"
+            tgt_file = "train_normal"
         tgt_file = os.path.join(tgt_dir, tgt_file + '.csv')
         log_file = ""
         trace_files = []
@@ -213,7 +225,10 @@ def WorkFlow():
                         tf.append(f_5)
                     else:
                         lf = f_5
-                TraceLogCombine(drain3_template, tf, lf, tgt_file)
+                parameter_list.append((drain3_template, tf, lf, tgt_file))
+                # p = Process(target=TraceLogCombine, args=(drain3_template, tf, lf, tgt_file))
+                # process_list.append(p)
+                # TraceLogCombine(drain3_template, tf, lf, tgt_file)
             else:
                 # If has no sub folder
                 if f_3.endswith("csv"):
@@ -221,7 +236,31 @@ def WorkFlow():
                 else:
                     log_file = f_3
         if log_file != "":
-            TraceLogCombine(drain3_template, trace_files, log_file, tgt_file)
+            # TraceLogCombine(drain3_template, trace_files, log_file, tgt_file)
+            parameter_list.append((drain3_template, trace_files, log_file, tgt_file))
+            # p = Process(target=TraceLogCombine, args=(drain3_template, tf, lf, tgt_file))
+            # process_list.append(p)
+    for para in parameter_list:
+        p = Process(target=TraceLogCombine, args=para)
+        process_list.append(p)
+    running_process = 0
+    inrunning = []
+    while True:
+        if running_process == len(process_list):
+            break
+        if len(inrunning) < 30:
+            print("added new process: {}".format(running_process))
+            process_list[running_process].start()
+            # process_list[running_process].join()
+            inrunning.append(running_process)
+            running_process += 1
+        finish = []
+        for index in inrunning:
+            if not process_list[index].is_alive():
+                finish.append(index)
+        for p in finish:
+            inrunning.remove(p)
+        finish.clear()
 
 # Tools
 def Time2Timestamp(timestr: str):
@@ -254,7 +293,7 @@ def GloveCorpusConstruction():
     """
     save_dir = "data/glove/corpus"
     tmp = Drain_Init()
-    tmp.load_state("tt")
+    tmp.load_state("tt2")
     save_file = open(save_dir, 'a+')
     for cluster in tmp.drain.clusters:
         template = cluster.get_template()
@@ -279,11 +318,15 @@ def RemoveSignals(line: str):
             res_list.remove(a)
     res = ' '.join(res_list)
     return res
-    
+
+def multiprocesstest(a, b, c, index):
+    t = random.randint(5,15)
+    time.sleep(t)
+    print("{} is finished!".format(index))
 
 if __name__ == '__main__':
     # TraceLogCombine(Drain_Init(), ['/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/SUCCESSF0101_SpanData2021-08-14_10-22-48.csv'], '/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/F0101raw_log2021-08-14_10-22-51.log', "train_F01.csv")
-    WorkFlow()
+    # WorkFlow()
     GloveCorpusConstruction()
     
 
