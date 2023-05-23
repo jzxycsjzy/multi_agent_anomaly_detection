@@ -206,7 +206,7 @@ def WorkFlow():
     # Read All data
     for f_0 in os.listdir(data_dir):
         if "F" in f_0:
-            tgt_file = "train_" + f_0[:3]
+            tgt_file = "train_" + f_0
         else:
             tgt_file = "train_normal"
         tgt_file = os.path.join(tgt_dir, tgt_file + '.csv')
@@ -248,7 +248,7 @@ def WorkFlow():
     while True:
         if running_process == len(process_list):
             break
-        if len(inrunning) < 30:
+        if len(inrunning) < 50:
             print("added new process: {}".format(running_process))
             process_list[running_process].start()
             # process_list[running_process].join()
@@ -319,14 +319,55 @@ def RemoveSignals(line: str):
     res = ' '.join(res_list)
     return res
 
-def multiprocesstest(a, b, c, index):
-    t = random.randint(5,15)
-    time.sleep(t)
-    print("{} is finished!".format(index))
+def Ini_Workflow():
+    fault_list = pd.read_csv("id_fault2.csv", index_col="id")
+    src_path = '/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/ProcessedData2/test'
+    pds = []
+    for i in tqdm(range(fault_list.shape[0])):
+        f = os.path.join(src_path, "test_" + fault_list.loc[i]['filename'] + '.csv')
+        if not os.path.exists(f):
+            print("file not exists!")
+            continue
+        dt = pd.read_csv(f)
+        pds.append(dt)
+    return pds, fault_list.to_dict()['filename']
+
+
+def workflow2(pds: list[pd.DataFrame], fault_list: dict):
+    print(len(pds))
+    process_list = []
+    for i in range(72):
+        p = Process(target=single_process, args=(pds[i], i))
+        p.start()
+        process_list.append(p)
+
+def single_process(pd: pd.DataFrame, fault_type: int):
+    save_dir = "/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/ProcessedData/test/"
+    count = 0
+
+    start_index = 0
+    end_index = 0
+    
+    trace_count = 0
+    for i in tqdm(range(pd.shape[0])):
+        if pd.loc[i]['parentspan'] == '-1' or pd.loc[i]['parentspan'] == -1 or i == pd.shape[0] - 1:
+            count += 1
+            if count == 2:
+                trace_count += 1
+                end_index = i
+                if end_index == pd.shape[0] - 1:
+                    end_index += 1
+                pd.iloc[start_index: end_index].to_csv(save_dir + pd.loc[start_index]['traceid'] + "_" + str(fault_type) + ".csv", index=False)
+                start_index = end_index
+                count = 1
+
 
 if __name__ == '__main__':
     # TraceLogCombine(Drain_Init(), ['/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/SUCCESSF0101_SpanData2021-08-14_10-22-48.csv'], '/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/F0101raw_log2021-08-14_10-22-51.log', "train_F01.csv")
     # WorkFlow()
-    GloveCorpusConstruction()
+    # GloveCorpusConstruction()
+
+    pds, fault_list = Ini_Workflow()
+    workflow2(pds, fault_list)
     
 

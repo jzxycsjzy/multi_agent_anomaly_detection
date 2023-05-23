@@ -10,3 +10,8 @@ ResultVisualization.py
 log.txt
 loss_pngs
 *.txt
+categoryModel
+category.pt
+*.sh
+*.png
+*.pkl
