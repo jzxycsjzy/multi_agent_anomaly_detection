@@ -580,7 +580,4 @@ def WorkTraceNew(models: dict[str: MAADModel], optimizers: dict[str: Adam], pd: 
 
             
 if __name__ == '__main__':
-    torch.multiprocessing.set_start_method('spawn')
-    # open("log.txt", 'w+')
-    fault_list = Init_workflow()
-    Sample(fault_list=fault_list)
+    pass

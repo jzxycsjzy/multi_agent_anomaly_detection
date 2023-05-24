@@ -75,12 +75,14 @@ class CategoryModel(nn.Module):
 
 import matplotlib.pyplot as plt
 def writeGraph(x, y, x_label, y_label, title):
-    plt.figure(figsize=(7.5, 3))
-    plt.plot(x, y, markerfacecolor='blue', marker='o')
+    plt.figure(figsize=(7.5, 4))
+    # , markerfacecolor='blue', marker='o'
+    plt.plot(x, y, color='c')
     plt.xlabel(x_label, fontsize=15)
     plt.ylabel(y_label, fontsize=15)
-    plt.xlim((0, 510))
-    plt.ylim((0,0.04))
+    plt.errorbar([50], [y[1]], yerr=[0.002],ecolor="red", elinewidth=4, capsize=4)
+    plt.xlim((0, 500))
+    plt.ylim((0, 0.04))
     plt.xticks(size=15)
     plt.yticks([0, 0.02, 0.04], size=15)
     plt.gca().set_aspect(3000)
@@ -88,9 +90,9 @@ def writeGraph(x, y, x_label, y_label, title):
     plt.savefig(title + ".png")
     plt.clf()
 
-def model_test():
+import psutil
+def time_test():
     # tgt_files = ["/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/F0101raw_log2021-08-14_10-22-51.log", "/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/normal/F02-04-normal/raw_log.log", "/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/normal/normal0809_03/raw_log2021-08-10_12-10-15.log", "/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/normal/normal0822_02/normal2_2021-08-22_22-05-06.log"]
-    
     # all_lines = []
     # for tgt_file in tgt_files:
     #     with open(tgt_file, 'r') as f:
@@ -123,7 +125,7 @@ def model_test():
         end_time = time.time()
         log_list.append(log_length)
         time_list.append(end_time - start_time)
-    writeGraph(log_list, time_list, "Number of Logs", "Latency(s)", "Single agent time latency")
+    writeGraph(log_list, time_list, "Number of Logs", "Latency (s)", "Single agent time latency")
     #     # print(classification.shape)
         # loss = crossentropyloss(classification, tgt)
         # # loss = sum([abs(cla[i] - tgt[i]) for i in range(15)])
@@ -188,6 +190,49 @@ def model_test():
     #     sum += dt[key]
     # print(sum / len(dt.keys()))
 
+def OverheadTest():
+    ori_cpu = psutil.cpu_percent(interval=1, percpu=False)
+    model = MAADModel()
+    for i in tqdm(range(1000)):
+        sample_data = torch.rand([1, 1, 50, 300], dtype=torch.float32)
+
+def DataMoveTest():
+    import pandas as pd
+    dt = pd.read_csv("dt.csv")
+    a = dt['a'].to_list()
+    b = dt['b'].to_list()
+    a_new = []
+    b_new = []
+    c_new = []
+    for i in range(len(a)):
+        if i == 0:
+            if b[i] > 100000:
+                a_new.append(a[0])
+                b_new.append(b[0])
+                c_new.append(0)
+        else:
+            if b[i] - b[i - 1] > 100000 and b[i] - b[i - 1] < 300000:
+                a_new.append(a[i] - a[i - 1])
+                b_new.append(b[i] - b[i - 1])
+                c_new.append(i)
+    count = [i for i in range(len(a))]
+
+    plt.figure(figsize=(15, 8))
+    # , markerfacecolor='blue', marker='o'
+    plt.plot(c_new, a_new, color='c', linewidth=3, label="Original transmit data size")
+    plt.plot(c_new, b_new, color='r', linewidth=3, label="MAAD transmit data size")
+    plt.legend(bbox_to_anchor=(1, 0.3), prop={'size': 17})
+    plt.xlabel("Index of Trace", fontsize=25)
+    plt.ylabel("Memory Usage (byte)", fontsize=25)
+    plt.xlim((0, 400))
+    plt.ylim((0, 300000))
+    plt.xticks(size=25)
+    plt.yticks((0, 100000, 200000, 300000), size=25)
+    # plt.gca().set_aspect(3000)
+    # plt.title(title, fontsize=15)
+    plt.savefig("TransferDecrease" + ".png")
+    plt.clf()
+
 
 if __name__ == '__main__':
-    model_test()
+    time_test()

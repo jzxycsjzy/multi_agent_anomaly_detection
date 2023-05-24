@@ -29,7 +29,7 @@ from data_preparation import Drain_Init, RemoveSignals
 from SIF.src import params, data_io, SIF_embedding
 
 __stdout__ = sys.stdout # 标准输出就用这行
-sys.stdout = open('run.txt', 'a+')
+sys.stdout = open('dt.txt', 'a+')
 
 # Init SIF parameters
 wordfile = "data/glove/vectors.txt" # word vector file, can be downloaded from GloVe website
@@ -52,14 +52,6 @@ loss_func = CrossEntropyLoss()
 # device = torch.device('cpu')
 
 from matplotlib import pyplot as plt
-
-def writeGraph(x, y, x_label, y_label, title):
-    plt.plot(x, y)
-    plt.xlabel(x_label)
-    plt.ylabel(y_label)
-    plt.title(title)
-    plt.savefig(title + ".png")
-    plt.clf()
 
 def Init_model() -> Tuple[dict[str: MAADModel], dict[str: torch.optim.Adam]]:
     """
@@ -88,7 +80,7 @@ def Sample(fault_list: dict):
     """
     Sample from each data frame and train the models
     """
-    ori_memory = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
+    # ori_memory = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
     batch_size = 1
 
     models = []
@@ -101,7 +93,7 @@ def Sample(fault_list: dict):
     # Init drain clusters
     tmp = Drain_Init()
     tmp.load_state("tt2")
-    print(u'加载完模型的内存使用：%.4f MB' % (psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024) )
+    # print(u'加载完模型的内存使用：%.4f MB' % (psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024) )
     start_time = time.time()
 
     data_dir = "./data/ProcessedData/test/"
@@ -133,10 +125,9 @@ def Sample(fault_list: dict):
                 # batch_count += 1
                 if len(args_list) == batch_size:
                     print("Process batch")
-                    # with Pool(batch_size) as p:
-                    #     p.map(map_func, args_list)
-                    Multi_Process_Optimizing(models[batch_count], optimizers[batch_count], pd_file_list[batch_count], fault_list, tmp, fault_type, ori_memory=ori_memory)
-                    return
+                    with Pool(batch_size) as p:
+                        p.map(map_func, args_list)
+                    # Multi_Process_Optimizing(models[batch_count], optimizers[batch_count], pd_file_list[batch_count], fault_list, tmp, fault_type, ori_memory=ori_memory)
                     batch_count = 0
                     args_list.clear()
                     for j in range(batch_size):
@@ -152,6 +143,9 @@ def Sample(fault_list: dict):
                     #     torch.save(models[0][service].state_dict(), save_dir + service + '.pt')
 
 def Model_Weight_Avg(models_list: list):
+    """
+    Model average
+    """
     for service in models_list[0].keys():
         worker_state_dict = []
         for i in range(len(models_list)):
@@ -169,6 +163,9 @@ def Model_Weight_Avg(models_list: list):
             models_list[i][service].load_state_dict(fed_state_dict)
 
 def RandomAddNormal(file_list: dict):
+    """
+    Random sample from dataset
+    """
     res = []
     for label in file_list.keys():
         random.shuffle(file_list[label])
@@ -180,6 +177,9 @@ def RandomAddNormal(file_list: dict):
 
 
 def map_func(x: tuple):
+    """
+    Multi processing entrance.
+    """
     return Multi_Process_Optimizing(x[0], x[1], x[2], x[3], x[4], x[5])
 
 
@@ -191,8 +191,12 @@ def Multi_Process_Optimizing(models: dict[str: MAADModel], optimizers: dict[str:
     memory_list = []
     count_list = []
     status = True
+
+    filesize = 0
+    maadsize = 0
     for file in filelist:
         start_time = time.time()
+        filesize += os.stat(file).st_size
         cur_pd = pd.read_csv(file)
         (path, file_name) = os.path.split(file)
         fault_type_0 = int(file_name.split('_')[1].split('.')[0])
@@ -203,7 +207,8 @@ def Multi_Process_Optimizing(models: dict[str: MAADModel], optimizers: dict[str:
         tgt = torch.tensor([fault_type_0], dtype=torch.long)
         
         # tgt = tgt.to(device)
-        WorkTrace(models=models, optimizers=optimizers, pd=cur_pd, fault_list=fault_list, tmp=tmp, fault_type=fault_type, category_list=category_list, feature_list=feature_list, tgt=tgt)
+        maadsize += WorkTrace(models=models, optimizers=optimizers, pd=cur_pd, fault_list=fault_list, tmp=tmp, fault_type=fault_type, category_list=category_list, feature_list=feature_list, tgt=tgt)
+        print(maadsize, filesize)
         # Optimizing
         decision_list = []
         confidence_list = []
@@ -216,9 +221,9 @@ def Multi_Process_Optimizing(models: dict[str: MAADModel], optimizers: dict[str:
             # decision_list.append(res)
             confidence_list.append(res)
             decision_list.append(res.index(max(res)))
-        # for service in optimizers.keys():
-        #     optimizers[service].step()
-        #     optimizers[service].zero_grad()
+        for service in optimizers.keys():
+            optimizers[service].step()
+            optimizers[service].zero_grad()
         # print("#;{};{};{}".format(fault_type_0, decision_list, confidence_list))
         end_time = time.time()
         time_span = end_time - start_time
@@ -228,12 +233,13 @@ def Multi_Process_Optimizing(models: dict[str: MAADModel], optimizers: dict[str:
         count_list.append(count)
         count += 1
         # writeGraph(count_list, time_list, "index of trace", "time cost", "Time_curve")
-        if len(memory_list) % 10 == 0: 
-            writeGraph(count_list[2:], memory_list[2:], "index of trace", "memory cost", "Memory usage curve")
-    print(sum(memory_list) / len(memory_list))
-    print(sum(time_list) / len(time_list))
+        # if len(memory_list) % 10 == 0: 
+        #     writeGraph(count_list[2:], memory_list[2:], "index of trace", "memory cost", "Memory usage curve")
+    # print(sum(memory_list) / len(memory_list))
+    # print(sum(time_list) / len(time_list))
 
 def WorkTrace(models: dict[str: MAADModel], optimizers: dict[str: Adam], pd: pd.DataFrame, fault_list: dict, tmp: TemplateMiner, fault_type: int, category_list: list, feature_list: list, tgt: torch.tensor):
+    # dt = 0
     pd = pd.reset_index(drop=True)
     # Obtain log and span vector
     start_log = pd.loc[0]['loginfo']
@@ -259,14 +265,18 @@ def WorkTrace(models: dict[str: MAADModel], optimizers: dict[str: Adam], pd: pd.
             child_series = pd[pd['spanid'] == child].reset_index(drop=True)
             if child_series.shape[0] != 0:
                 child_service = child_series.loc[0]['service']
-                WorkForward(models=models, optimizers=optimizers, pd=pd, fault_list=fault_list, tmp=tmp, cur_logs=child_series.loc[0]['loginfo'], cur_spans=child_series.loc[0]['spaninfo'], childs=child_series.loc[0]['childspans'], cur_service=child_service, fault_type=fault_type, prev_out=cur_out, category_list=category_list, feature_list=feature_list, tgt=tgt)
+                # dt += sys.getsizeof(cur_out)
+                # dt += WorkForward(models=models, optimizers=optimizers, pd=pd, fault_list=fault_list, tmp=tmp, cur_logs=child_series.loc[0]['loginfo'], cur_spans=child_series.loc[0]['spaninfo'], childs=child_series.loc[0]['childspans'], cur_service=child_service, fault_type=fault_type, prev_out=cur_out, category_list=category_list, feature_list=feature_list, tgt=tgt)
     else:
         # It could represent that this span has come to end. Calculate the loss and backward
         category_list.append(category)
         feature_list.append(cur_out)
+    #     dt += sys.getsizeof(category)
+    # return dt
 
 
 def WorkForward(models: dict[str: MAADModel], optimizers: dict[str:Adam], pd: pd.DataFrame, fault_list: dict, tmp: TemplateMiner, cur_logs: list, cur_spans: list, childs: list, cur_service: str, fault_type: int, prev_out: torch.tensor, category_list: list, feature_list: list, tgt: torch.tensor):
+    # dt = 0
     cuda = next(models[cur_service].parameters()).device
     
     cur_vectors = Logs2Vectors(cur_logs=cur_logs, tmp=tmp)
@@ -287,11 +297,14 @@ def WorkForward(models: dict[str: MAADModel], optimizers: dict[str:Adam], pd: pd
             child_series = pd[pd['spanid'] == child].reset_index(drop=True)
             if child_series.shape[0] != 0:
                 child_service = child_series.loc[0]['service']
-                WorkForward(models=models, optimizers=optimizers, pd=pd, fault_list=fault_list, tmp=tmp, cur_logs=child_series.loc[0]['loginfo'], cur_spans=child_series.loc[0]['spaninfo'], childs=child_series.loc[0]['childspans'], cur_service=child_service, fault_type=fault_type, prev_out=cur_out, category_list=category_list, feature_list=feature_list, tgt=tgt)
+                # dt += sys.getsizeof(cur_out)
+                # dt += WorkForward(models=models, optimizers=optimizers, pd=pd, fault_list=fault_list, tmp=tmp, cur_logs=child_series.loc[0]['loginfo'], cur_spans=child_series.loc[0]['spaninfo'], childs=child_series.loc[0]['childspans'], cur_service=child_service, fault_type=fault_type, prev_out=cur_out, category_list=category_list, feature_list=feature_list, tgt=tgt)
     # It could represent that this span has come to end. Calculate the loss and backward
     else:
         feature_list.append(cur_out)
         category_list.append(category)
+    #     dt += sys.getsizeof(category)
+    # return dt
 
 
 
@@ -323,10 +336,5 @@ def GetValue(d: dict, v: str):
 
 if __name__ == '__main__':
     torch.multiprocessing.set_start_method('spawn')
-    # checkpoint = torch.load("./models/Model2_00/ts-food-service.pt", map_location=torch.device('cpu'))
-    # for item in checkpoint:
-    #     print(checkpoint[item].shape)
-    print(u'当前进程的内存使用：%.4f MB' % (psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024) )
-    open("log.txt", 'w+')
     fault_list = Init_workflow()
     Sample(fault_list=fault_list)

@@ -183,10 +183,10 @@ def TraceLogCombine(tmp: TemplateMiner, trace_list: list, log_file: str, tgt_fil
             logs = pd.concat([cache, logs], axis=0)
         print(tgt_file)
         logs.to_csv(tgt_file, index = False)
-        tmp.save_state("tt2")
+        # tmp.save_state("tt2")
 
-    with open("finished_log2.txt", 'a+') as f:
-        f.write(log_file + "\n")
+    # with open("finished_log2.txt", 'a+') as f:
+    #     f.write(log_file + "\n")
 
 
 
@@ -367,7 +367,28 @@ if __name__ == '__main__':
     # WorkFlow()
     # GloveCorpusConstruction()
 
-    pds, fault_list = Ini_Workflow()
-    workflow2(pds, fault_list)
-    
+    # pds, fault_list = Ini_Workflow()
+    # workflow2(pds, fault_list)
+    tmp = Drain_Init()
+    trace = "/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/SUCCESSF0101_SpanData2021-08-14_10-22-48.csv"
+    log = "/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/DeepTraLog/TraceLogData/F01-01/F0101raw_log2021-08-14_10-22-51.log"
 
+
+    filesize = os.stat(trace).st_size + os.stat(log).st_size 
+    all_span = pd.read_csv(trace)
+    trace_list = []
+    for i in tqdm(range(all_span.shape[0])):
+        line = all_span.loc[i]
+        if line['ParentSpan'] == "-1" or line['ParentSpan'] == -1:
+            trace_list.append(line['TraceId'])
+    
+    second_size = 0
+    tgt_path = "/home/rongyuan/workspace/anomalydetection/multi_agent_anomaly_detection/data/ProcessedData"
+    type_dt = ["train", "test"]
+    for t in type_dt:
+        file_path = os.path.join(tgt_path, t)
+        for file in os.listdir(file_path):
+            if file.split('_')[0] in trace_list:
+                f = os.path.join(file_path, file)
+                second_size += os.stat(f).st_size
+    print(second_size, filesize)
