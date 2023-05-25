@@ -21,7 +21,7 @@ from torch.optim import Adam
 # Import drain3
 from drain3 import TemplateMiner
 # Import some tools
-from MAADModel2 import MAADModel
+from model.MAADModel2 import MAADModel
 # from MAADModel import DecisionFusion as MAADCategory
 from data_preparation import Drain_Init, RemoveSignals
 
