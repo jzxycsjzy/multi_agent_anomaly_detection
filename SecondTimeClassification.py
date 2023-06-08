@@ -1,17 +1,9 @@
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor # 0.80
 from sklearn.ensemble import HistGradientBoostingClassifier # 0.84
-from sklearn.ensemble import VotingClassifier, RandomForestClassifier # 0.813
-from sklearn.tree import DecisionTreeClassifier
-
-from sklearn.neural_network import MLPClassifier # 0.815
 from sklearn.metrics import recall_score, precision_score
 
 from tqdm import tqdm
-import numpy as np
-import sys
-
+import argparse
 
 def CheckData(file = "res.txt"):
     data = []
@@ -51,11 +43,6 @@ def CheckData(file = "res.txt"):
                 if i == len(categories) - 1:
                     c = 5
                 res[index] += (item % 0.1) * c
-
-            # add_num = 1
-            
-            #     add_num = 12
-            # res[category] += add_num
         res = res.index(max(res))
         if res == label:
             res_dict[label][0] += 1
@@ -65,8 +52,6 @@ def CheckData(file = "res.txt"):
         for i in range(2):
             r[i] += res_dict[c][i]
     r[2] = r[0] / r[1]
-    # print(r)
-    # print(res_dict)
     maxlen = 0
     for item in data:
         if len(item) > maxlen:
@@ -83,22 +68,18 @@ def CheckData(file = "res.txt"):
     return real_dt, labels
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    # Add arguments
+    parser.add_argument("--trainset", type=str, default="train.txt", help="trainset of Multi-decision Merger")
+    parser.add_argument("--testset", type=str, default="test.txt", help="testset of Multi-decision Merger")
+    arguments = parser.parse_args()
     
-    data, labels = CheckData("res.txt")
-    train_data, train_label = CheckData("log.txt")
-    # split train_set and test_set
+    data, labels = CheckData(arguments.trainset)
+    train_data, train_label = CheckData(arguments.testset)
+    # Split trainset and test set
     X_train, _, y_train, _ = train_test_split(data, labels, test_size=0.05, random_state=1002)
     X_test, _, y_test, _ = train_test_split(train_data, train_label, test_size=0.05, random_state=1002)
     # Train the model
-    # clf2 = HistGradientBoostingClassifier(learning_rate=0.05, max_iter=300, l2_regularization=0.2, min_samples_leaf=2, verbose=1, max_leaf_nodes=128)
-    # clf2.fit(X_train, y_train)
-    # scores = clf2.score(X_test, y_test)
-    # scores.mean()
-    # res = clf2.predict(X_test)
-    # r = recall_score(y_test, res, pos_label=0)
-    # print('Accuracy:', scores) 0.9640
-    # print('Recall: ', r) 0.9919
-
     clf2 = HistGradientBoostingClassifier(learning_rate=0.05, max_iter=300, l2_regularization=0.3, min_samples_leaf=3, verbose=1, max_leaf_nodes=256, early_stopping=False)
     clf2.fit(X_train, y_train)
     scores = clf2.score(X_test, y_test)
@@ -106,6 +87,7 @@ if __name__ == '__main__':
     res = clf2.predict(X_test)
     r = recall_score(y_test, res, pos_label=0)
     p = precision_score(y_test, res, pos_label=0)
-    print('Accuracy:', scores) # 0.9694
-    print('Recall: ', r) # 0.9946
+    print('Accuracy:', scores)
+    print('Recall: ', r)
     print('Precision:', p)
+
