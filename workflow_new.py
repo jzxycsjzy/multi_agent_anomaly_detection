@@ -3,37 +3,35 @@ from typing import Tuple
 
 import os
 import sys
-import time
-import copy
 import random
 from tqdm import tqdm
 import pandas as pd
-import numpy as np
 import collections
-from multiprocessing import Process, Pool
-import psutil
+from multiprocessing import Pool
+import argparse
 
+# Import torch modules
 import torch
-from torch.nn import CrossEntropyLoss, BCEWithLogitsLoss, Module
+from torch.nn import CrossEntropyLoss
 from torch.optim import Adam
 
 
 # Import drain3
 from drain3 import TemplateMiner
+# Import model class
+from model.MAADModel import MAADModel
 # Import some tools
-from model.MAADModel2 import MAADModel
-# from MAADModel import DecisionFusion as MAADCategory
 from data_preparation import Drain_Init, RemoveSignals
 
-# Import NLP model
+# Import sentence vectorization module
 from SIF.src import params, data_io, SIF_embedding
-
-__stdout__ = sys.stdout # 标准输出就用这行
+# Save the output to the file
+__stdout__ = sys.stdout
 sys.stdout = open('dt.txt', 'a+')
 
 # Init SIF parameters
-wordfile = "data/glove/vectors.txt" # word vector file, can be downloaded from GloVe website
-weightfile = "data/glove/vocab.txt" # each line is a word and its frequency
+wordfile = "./GloVeModel/vectors.txt" # word vector file, can be downloaded from GloVe website
+weightfile = "./GloVeModel/vocab.txt" # each line is a word and its frequency
 weightpara = 1e-3 # the parameter in the SIF weighting scheme, usually in the range [3e-5, 3e-3]
 rmpc = 1 # number of principal components to remove in SIF weighting scheme
 # load word vectors
@@ -47,82 +45,87 @@ param.rmpc = rmpc
 
 # Set loss function
 loss_func = CrossEntropyLoss()
-# Set training device //  if torch.cuda.is_available() else "cpu"
-# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# device = torch.device('cpu')
 
-from matplotlib import pyplot as plt
+# Set Pre config
+service_pos = 2
+span_pos = 4
+error_pos = 9
+event_pos = 10
+child_pos = 11
+log_pos = 12
 
-def Init_model() -> Tuple[dict[str: MAADModel], dict[str: torch.optim.Adam]]:
+def Init_model(servicelist: str, error_types: int) -> Tuple[dict[str: MAADModel], dict[str: torch.optim.Adam]]:
     """
     Init model from service list. Assign one model for each service
     """
     model_list = {}
     optimizer_list = {}
-    service_list = pd.read_csv("id_service.csv").drop(labels="Unnamed: 0", axis=1)
+    service_list = pd.read_csv(servicelist)
+    # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     for i in tqdm(range(service_list.shape[0])):
         service = service_list.loc[i]["Service"]
-        model_list[service] = MAADModel()
-        model_list[service].load_state_dict(torch.load("./models/Model2_00/" + service + ".pt", map_location='cpu'))
+        model_list[service] = MAADModel(error_types)
         # model_list[service].to(device)
         optimizer_list[service] = torch.optim.Adam(lr=0.0001, params=model_list[service].parameters())
     return model_list, optimizer_list
 
-def Init_workflow() -> Tuple[list[pd.DataFrame], dict]:
+def Init_workflow(fault_list: str) -> Tuple[list[pd.DataFrame], dict]:
     """
-    Init work flow and load all data files
+    Init fualt list
     """
-    fault_list_1 = pd.read_csv("id_fault2.csv", index_col="id")
-    fault_list_0 = pd.read_csv("id_fault.csv", index_col="id")
-    return fault_list_1.to_dict()['filename']
+    fault_list = pd.read_csv(fault_list)
+    fault_list = fault_list.to_dict()['faultname']
+    fault_list = {v : k for k, v in fault_list.items()}
+    return fault_list
 
-def Sample(fault_list: dict):
+def Sample(fault_list: dict, arguments):
     """
     Sample from each data frame and train the models
     """
     # ori_memory = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-    batch_size = 1
+    batch_size = arguments.batch
 
     models = []
     optimizers = []
     # Init Models based on batch_size
     for i in range(batch_size):
-        model_dict, optim_dict = Init_model()
+        model_dict, optim_dict = Init_model(arguments.servicelist, arguments.errortypes)
         models.append(model_dict)
         optimizers.append(optim_dict)
     # Init drain clusters
     tmp = Drain_Init()
-    tmp.load_state("tt2")
-    # print(u'加载完模型的内存使用：%.4f MB' % (psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024) )
-    start_time = time.time()
+    tmp.load_state(arguments.drain)
 
-    data_dir = "./data/ProcessedData/test/"
-    file_list = os.listdir(data_dir)
+    # data_dir = "./data/ProcessedData/test/"
+    file_list = os.listdir(arguments.trainset)
     # Resample dataset
-    file_c = {}
-    for file in file_list:
-        fault_type = file.split('_')[1].split('.')[0]
-        if fault_type in file_c.keys():
-            file_c[fault_type].append(file)
-        else:
-            file_c[fault_type] = [file]
+    if arguments.labelmode == 0:
+        file_c = {}
+        for file in file_list:
+            fault_type = file.split('_')[1].split('.')[0]
+            if fault_type in file_c.keys():
+                file_c[fault_type].append(file)
+            else:
+                file_c[fault_type] = [file]
+    else:
+        file_c = file_list
+    args_list = []
+    pd_file_list = [[] for i in range(batch_size)]
+    batch_count = 0
     # Start training
-    for epoch in range(1):
+    for epoch in range(30):
         print("Epoch {} has started.".format(epoch))
         random.shuffle(file_list)
-        cur_file_list = RandomAddNormal(file_list=file_c)
+        # cur_file_list = RandomAddNormal(file_list=file_c)
         cur_file_list = file_list
-        args_list = []
-        pd_file_list = [[] for i in range(batch_size)]
-        batch_count = 0
         for i in tqdm(range(len(cur_file_list))):
-            fault_type = int(cur_file_list[i].split('_')[1].split('.')[0])
-            file = os.path.join(data_dir, cur_file_list[i])
+            # fault_type = int(cur_file_list[i].split('_')[1].split('.')[0])
+            file = os.path.join(arguments.trainset, cur_file_list[i])
             pd_file_list[batch_count].append(file)
-            if len(pd_file_list[batch_count]) == 1000:
-                args = (models[batch_count], optimizers[batch_count], pd_file_list[batch_count], fault_list, tmp, fault_type)
+            if len(pd_file_list[batch_count]) == 100000:
+                args = (models[batch_count], optimizers[batch_count], pd_file_list[batch_count], fault_list, tmp, arguments)
                 args_list.append(args)
-                # batch_count += 1
+                batch_count += 1
                 if len(args_list) == batch_size:
                     print("Process batch")
                     with Pool(batch_size) as p:
@@ -132,15 +135,12 @@ def Sample(fault_list: dict):
                     args_list.clear()
                     for j in range(batch_size):
                         pd_file_list[j].clear()
-                    # Model_Weight_Avg(models)
-                    end_time = time.time()
-                    print("Time cost in this batch:{}".format(end_time - start_time))
-                    start_time = end_time
-                    # for service in models[0].keys():
-                    #     save_dir = './models/Model2_00/'
-                    #     if not os.path.exists(save_dir):
-                    #         os.mkdir(save_dir)
-                    #     torch.save(models[0][service].state_dict(), save_dir + service + '.pt')
+                    Model_Weight_Avg(models)
+                    for service in models[0].keys():
+                        save_dir = './models/Modelgaia/'
+                        if not os.path.exists(save_dir):
+                            os.mkdir(save_dir)
+                        torch.save(models[0][service].state_dict(), save_dir + service + '.pt')
 
 def Model_Weight_Avg(models_list: list):
     """
@@ -183,128 +183,139 @@ def map_func(x: tuple):
     return Multi_Process_Optimizing(x[0], x[1], x[2], x[3], x[4], x[5])
 
 
-def Multi_Process_Optimizing(models: dict[str: MAADModel], optimizers: dict[str: Adam], filelist: list[str], fault_list: dict, tmp: TemplateMiner, fault_type: int, ori_memory=None):
-    fault_list_0 = pd.read_csv("id_fault.csv", index_col="id").to_dict()['filename']
-    fault_list_1 = pd.read_csv("id_fault2.csv", index_col="id").to_dict()['filename']
-    count = 0
-    time_list = []
-    memory_list = []
-    count_list = []
-    status = True
-
-    filesize = 0
-    maadsize = 0
+def Multi_Process_Optimizing(models: dict[str: MAADModel], optimizers: dict[str: Adam], filelist: list[str], fault_list: dict, tmp: TemplateMiner, arguments):
     for file in filelist:
-        start_time = time.time()
-        filesize += os.stat(file).st_size
-        cur_pd = pd.read_csv(file)
-        (path, file_name) = os.path.split(file)
-        fault_type_0 = int(file_name.split('_')[1].split('.')[0])
+        # cur_pd = pd.read_csv(file)
+        # cur_pd.to_csv('test.csv')
+        with open(file, 'r') as f:
+            lines = f.readlines()[1:]
+        _, file_name = os.path.split(file)
+        if arguments.labelmode == 0:
+            fault = int(file_name.split('_')[1])
         category_list = []
         feature_list = []
-        fault_type_1 = GetValue(fault_list_0, fault_list_1[fault_type_0])
-        # fault_type = 1 if fault_type == 71 else 0 # normal=1
-        tgt = torch.tensor([fault_type_0], dtype=torch.long)
-        
-        # tgt = tgt.to(device)
-        maadsize += WorkTrace(models=models, optimizers=optimizers, pd=cur_pd, fault_list=fault_list, tmp=tmp, fault_type=fault_type, category_list=category_list, feature_list=feature_list, tgt=tgt)
-        print(maadsize, filesize)
-        # Optimizing
+        error_list = []
+        WorkTrace(models=models, optimizers=optimizers, lines=lines, fault_list=fault_list, tmp=tmp, error_list=error_list, category_list=category_list, feature_list=feature_list)
+        # Optimizing phase
         decision_list = []
-        confidence_list = []
-        for category in category_list:
-            # loss = loss_func(category, tgt)
-            # loss = loss / cur_pd.shape[0]
-            # loss.backward(retain_graph=True)
-            # Print decision
+        tgt = torch.tensor([fault], dtype=torch.long)
+        for i in range(len(category_list)):
+            category = category_list[i]
             res = category.cpu().detach().numpy().tolist()[0]
+            if arguments.labelmode == 0:
+                fault = error_list[i]
+                tgt = torch.tensor([fault], dtype=torch.long)
+            loss = loss_func(category, tgt)
+            loss = loss / len(lines)
+            loss.backward(retain_graph=True)
             # decision_list.append(res)
-            confidence_list.append(res)
+            # confidence_list.append(res)
             decision_list.append(res.index(max(res)))
+        print(decision_list, error_list)
         for service in optimizers.keys():
             optimizers[service].step()
             optimizers[service].zero_grad()
         # print("#;{};{};{}".format(fault_type_0, decision_list, confidence_list))
-        end_time = time.time()
-        time_span = end_time - start_time
-        time_list.append(time_span)
-        memory = psutil.Process(os.getpid()).memory_info().rss / 1024 / 1024
-        memory_list.append(memory - ori_memory)
-        count_list.append(count)
-        count += 1
-        # writeGraph(count_list, time_list, "index of trace", "time cost", "Time_curve")
-        # if len(memory_list) % 10 == 0: 
-        #     writeGraph(count_list[2:], memory_list[2:], "index of trace", "memory cost", "Memory usage curve")
-    # print(sum(memory_list) / len(memory_list))
-    # print(sum(time_list) / len(time_list))
 
-def WorkTrace(models: dict[str: MAADModel], optimizers: dict[str: Adam], pd: pd.DataFrame, fault_list: dict, tmp: TemplateMiner, fault_type: int, category_list: list, feature_list: list, tgt: torch.tensor):
-    # dt = 0
-    pd = pd.reset_index(drop=True)
+def WorkTrace(models: dict[str: MAADModel], optimizers: dict[str: Adam], lines: list, fault_list: dict, tmp: TemplateMiner, error_list: list, category_list: list, feature_list: list, label_mode: int):
     # Obtain log and span vector
-    start_log = pd.loc[0]['loginfo']
-    start_span = pd.loc[0]['spaninfo']
+    start_trace_info = lines[0].split(',')
+    
+    # Init data
+    cur_service = start_trace_info[service_pos]
+    start_span = start_trace_info[event_pos]
+    cur_childs = [] if str(start_trace_info[child_pos])=="0" else start_trace_info[child_pos].rstrip().split(';')
+    # The first span should have at least one child span, otherwise this data is error.
+    if cur_childs == []:
+        return
+    start_log = [] if len(start_trace_info) <= 12 else ','.join(start_trace_info[log_pos:]).split(';')
+    
     cur_vectors = Logs2Vectors(start_log, tmp=tmp)
     cur_span_vectors = Logs2Vectors([start_span], tmp=tmp)
     # Make sure the service name
-    cur_service = pd.loc[0]['service']
-    cuda = next(models[cur_service].parameters()).device
+    # cuda = next(models[cur_service].parameters()).device
     cur_tensor = None
     if cur_vectors != []:
         cur_tensor = torch.tensor(cur_vectors, dtype=torch.float32) if cur_vectors != [] else None
         cur_tensor = cur_tensor.unsqueeze(0).unsqueeze(0)
     cur_span_tensor = torch.tensor(cur_span_vectors, dtype=torch.float32)
     cur_span_tensor = cur_span_tensor.unsqueeze(0).unsqueeze(0)
-    cur_tensor = cur_tensor.to(cuda) if cur_tensor != None else None
-    cur_span_tensor = cur_span_tensor.to(cuda)
+    # cur_tensor = cur_tensor.to(cuda) if cur_tensor != None else None
+    # cur_span_tensor = cur_span_tensor.to(cuda)
     info_tensor = torch.cat([cur_span_tensor, cur_tensor], dim=-2) if cur_tensor != None else cur_span_tensor
     cur_out, category = models[cur_service](info_tensor)
-    cur_childs = eval(pd.loc[0]['childspans'])
+    if label_mode == 1:
+        error_type = fault_list[int(start_trace_info[error_pos])]
+        error_list.append(error_type)
+        category_list.append(category)
     if len(cur_childs) != 0:
         for child in cur_childs:
-            child_series = pd[pd['spanid'] == child].reset_index(drop=True)
-            if child_series.shape[0] != 0:
-                child_service = child_series.loc[0]['service']
-                # dt += sys.getsizeof(cur_out)
-                # dt += WorkForward(models=models, optimizers=optimizers, pd=pd, fault_list=fault_list, tmp=tmp, cur_logs=child_series.loc[0]['loginfo'], cur_spans=child_series.loc[0]['spaninfo'], childs=child_series.loc[0]['childspans'], cur_service=child_service, fault_type=fault_type, prev_out=cur_out, category_list=category_list, feature_list=feature_list, tgt=tgt)
+            child_line = ""
+            for i in range(1, len(lines)):
+                cur_line = lines[i]
+                cur_info = cur_line.split(',')[span_pos]
+                if cur_info == child:
+                    child_line = cur_line
+                    break
+            if child_line != "":
+                WorkForward(lines=lines, models=models, optimizers=optimizers, line=child_line, fault_list=fault_list, tmp=tmp, error_list=error_list, prev_out=cur_out, category_list=category_list, feature_list=feature_list, label_mode=label_mode)
     else:
         # It could represent that this span has come to end. Calculate the loss and backward
-        category_list.append(category)
-        feature_list.append(cur_out)
-    #     dt += sys.getsizeof(category)
-    # return dt
+        if label_mode == 0:
+            category_list.append(category)
 
 
-def WorkForward(models: dict[str: MAADModel], optimizers: dict[str:Adam], pd: pd.DataFrame, fault_list: dict, tmp: TemplateMiner, cur_logs: list, cur_spans: list, childs: list, cur_service: str, fault_type: int, prev_out: torch.tensor, category_list: list, feature_list: list, tgt: torch.tensor):
-    # dt = 0
-    cuda = next(models[cur_service].parameters()).device
+def WorkForward(lines: list, models: dict[str: MAADModel], optimizers: dict[str:Adam], line: str, fault_list: dict, tmp: TemplateMiner, error_list: list, prev_out: torch.tensor, category_list: list, feature_list: list, label_mode: int):
+    # cuda = next(models[cur_service].parameters()).device
+    start_trace_info = line.split(',')
+    # Init data
+    # prev_out = prev_out
+    # zeros = torch.tensor([[0] * 296], dtype=torch.float32)
+    # prev_out = torch.cat([prev_out, zeros], dim=-1).unsqueeze(0).unsqueeze(0)
     
-    cur_vectors = Logs2Vectors(cur_logs=cur_logs, tmp=tmp)
-    cur_span_vectors = Logs2Vectors(cur_logs=[cur_spans], tmp=tmp)
-
+    cur_service = start_trace_info[service_pos]
+    start_span = start_trace_info[event_pos]
+    
+    cur_childs = [] if str(start_trace_info[child_pos])=="0" else start_trace_info[child_pos].rstrip().split(';')
+    # The first span should have at least one child span, otherwise this data is error.
+    if cur_childs == []:
+        return
+    start_log = [] if len(start_trace_info) <= 12 else ','.join(start_trace_info[log_pos:]).split(';')
+    
+    cur_vectors = Logs2Vectors(start_log, tmp=tmp)
+    cur_span_vectors = Logs2Vectors([start_span], tmp=tmp)
+    if cur_span_vectors == []:
+        return
     cur_tensor = torch.tensor(cur_vectors, dtype=torch.float32) if cur_vectors != [] else None
     if cur_tensor != None:
         cur_tensor = cur_tensor.unsqueeze(0).unsqueeze(0)
-        cur_tensor = cur_tensor.to(cuda)
+        # cur_tensor = cur_tensor.to(cuda)
     cur_span_tensor = torch.tensor(cur_span_vectors, dtype=torch.float32)
     cur_span_tensor = cur_span_tensor.unsqueeze(0).unsqueeze(0)
-    cur_span_tensor = cur_span_tensor.to(cuda)
+    # cur_span_tensor = cur_span_tensor.to(cuda)
     info_tensor = torch.cat([prev_out, cur_span_tensor, cur_tensor], dim=-2) if cur_tensor != None else torch.cat([prev_out, cur_span_tensor], dim=-2)
     cur_out, category = models[cur_service](info_tensor)
-    cur_childs = eval(childs)
+    
+    if label_mode == 1:
+        error_type = fault_list[int(start_trace_info[9])]
+        error_list.append(error_type)
+        category_list.append(category)
+    
     if len(cur_childs) != 0:
         for child in cur_childs:
-            child_series = pd[pd['spanid'] == child].reset_index(drop=True)
-            if child_series.shape[0] != 0:
-                child_service = child_series.loc[0]['service']
-                # dt += sys.getsizeof(cur_out)
-                # dt += WorkForward(models=models, optimizers=optimizers, pd=pd, fault_list=fault_list, tmp=tmp, cur_logs=child_series.loc[0]['loginfo'], cur_spans=child_series.loc[0]['spaninfo'], childs=child_series.loc[0]['childspans'], cur_service=child_service, fault_type=fault_type, prev_out=cur_out, category_list=category_list, feature_list=feature_list, tgt=tgt)
+            child_line = ""
+            for i in range(1, len(lines)):
+                cur_line = lines[i]
+                cur_info = cur_line.split(',')[span_pos]
+                if cur_info == child:
+                    child_line = cur_line
+                    break
+            if child_line != "":
+                WorkForward(lines=lines, models=models, optimizers=optimizers, line=child_line, fault_list=fault_list, tmp=tmp, error_list=error_list, prev_out=cur_out, category_list=category_list, feature_list=feature_list, label_mode=label_mode)
     # It could represent that this span has come to end. Calculate the loss and backward
     else:
-        feature_list.append(cur_out)
-        category_list.append(category)
-    #     dt += sys.getsizeof(category)
-    # return dt
+        if label_mode == 0:
+            category_list.append(category)
 
 
 
@@ -312,20 +323,21 @@ def Logs2Vectors(cur_logs, tmp: TemplateMiner) -> list:
     """
     Transfer logs and spans to sentence vectors
     """
-    sentences = None
-    if type(cur_logs) == str:
-        cur_logs = eval(cur_logs)
-        sentences = [cur_logs[i][2] for i in range(len(cur_logs))]
-    else:
-        sentences = cur_logs
+    sentences = cur_logs
     embedding = []
+    outsentences = []
     if cur_logs != []:
-        for i in range(len(sentences)):
-            sentence = RemoveSignals(tmp.add_log_message(sentences[i].strip())['template_mined'])
-            sentences[i] = sentence
-        x, m = data_io.sentences2idx(sentences=sentences, words=words)
-        w = data_io.seq2weight(x, m, weight4ind)
-        embedding = SIF_embedding.SIF_embedding(We, x, w, param)
+        try:
+            for i in range(len(sentences)):
+                if sentences[i] == '':
+                    continue
+                sentence = RemoveSignals(tmp.add_log_message(sentences[i].strip())['template_mined'])
+                outsentences.append(sentence)
+            x, m = data_io.sentences2idx(sentences=outsentences, words=words)
+            w = data_io.seq2weight(x, m, weight4ind)
+            embedding = SIF_embedding.SIF_embedding(We, x, w, param)
+        except Exception:
+            pass
     return embedding
 
 def GetValue(d: dict, v: str):
@@ -336,5 +348,26 @@ def GetValue(d: dict, v: str):
 
 if __name__ == '__main__':
     torch.multiprocessing.set_start_method('spawn')
-    fault_list = Init_workflow()
-    Sample(fault_list=fault_list)
+    parser = argparse.ArgumentParser()
+    # Add arguments
+    parser.add_argument("--servicelist", type=str, default="id_service.csv", help="csv file of service list.")
+    parser.add_argument("--faultlist", type=str, default="id_fault2.csv", help="csv file of fault list.")
+    parser.add_argument("--batch", type=int, default=1, help="Batch size of training.")
+    parser.add_argument("--trainset", type=str, default="", help="Abs path of training set")
+    parser.add_argument("--labelmode", type=int, default=1, help="0=one label for one trace, 1=one label for one span")
+    parser.add_argument("--drain", type=str, default="gaia", help="Name of drain model")
+    parser.add_argument("--errortypes", type=int, default=72, help="Number of error types of the datset. The normal type should be the 0 one.")
+    parser.add_argument("--fileconfig", type=str, default="2,4,9,10,11,12", help="Six numbers split by ',' to indicate the position of important information servicename, spanid, error code (if the dataset does not have errorcode, write any number is fine.), span event, child list and log list.")
+    
+    
+    arguments = parser.parse_args()
+    pre_config = arguments.fileconfig.split(',')
+    service_pos = pre_config[0]
+    span_pos = pre_config[1]
+    error_pos = pre_config[2]
+    event_pos = pre_config[3]
+    child_pos = pre_config[4]
+    log_pos = pre_config[5]
+    
+    fault_list = Init_workflow(arguments.faultlist)
+    Sample(fault_list=fault_list, arguments=arguments)
