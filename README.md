@@ -18,7 +18,7 @@ or
 
 Refer to http://docs.aiops.cloudwise.com/en/ to get another dataset.
 ## Quick Start
-Use data_preparation.py to preprocess your dataset.
+Firstly, split the whole dataset into saperated trace file such as example_log.txt.
 
 Use workflow_new.py to train multi agents.
 
