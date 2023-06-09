@@ -80,7 +80,7 @@ if __name__ == '__main__':
     X_train, _, y_train, _ = train_test_split(data, labels, test_size=0.05, random_state=1002)
     X_test, _, y_test, _ = train_test_split(train_data, train_label, test_size=0.05, random_state=1002)
     # Train the model
-    clf2 = HistGradientBoostingClassifier(learning_rate=0.05, max_iter=300, l2_regularization=0.3, min_samples_leaf=3, verbose=1, max_leaf_nodes=256, early_stopping=False)
+    clf2 = HistGradientBoostingClassifier(learning_rate=0.05, max_iter=300, l2_regularization=0.2, min_samples_leaf=4, verbose=1, max_leaf_nodes=200, early_stopping=False)
     clf2.fit(X_train, y_train)
     scores = clf2.score(X_test, y_test)
     scores.mean()
