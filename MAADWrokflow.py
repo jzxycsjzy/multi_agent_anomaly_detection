@@ -54,7 +54,7 @@ event_pos = 10
 child_pos = 11
 log_pos = 12
 
-def Init_model(servicelist: str, error_types: int) -> Tuple[dict[str: MAADModel], dict[str: torch.optim.Adam]]:
+def Init_model(servicelist: str, error_types: int, isTrain: bool) -> Tuple[dict[str: MAADModel], dict[str: torch.optim.Adam]]:
     """
     Init model from service list. Assign one model for each service
     """
@@ -65,6 +65,8 @@ def Init_model(servicelist: str, error_types: int) -> Tuple[dict[str: MAADModel]
     for i in tqdm(range(service_list.shape[0])):
         service = service_list.loc[i]["Service"]
         model_list[service] = MAADModel(error_types)
+        if not isTrain:
+            model_list[service].load_state_dict(torch.load("./models/" + service + ".pt"))
         # model_list[service].to(device)
         optimizer_list[service] = torch.optim.Adam(lr=0.0001, params=model_list[service].parameters())
     return model_list, optimizer_list
@@ -113,7 +115,7 @@ def Sample(fault_list: dict, arguments):
     pd_file_list = [[] for i in range(batch_size)]
     batch_count = 0
     # Start training
-    for epoch in range(30):
+    for epoch in range(5):
         print("Epoch {} has started.".format(epoch))
         random.shuffle(file_list)
         # cur_file_list = RandomAddNormal(file_list=file_c)
@@ -137,7 +139,7 @@ def Sample(fault_list: dict, arguments):
                         pd_file_list[j].clear()
                     Model_Weight_Avg(models)
                     for service in models[0].keys():
-                        save_dir = './models/Modelgaia/'
+                        save_dir = './models/'
                         if not os.path.exists(save_dir):
                             os.mkdir(save_dir)
                         torch.save(models[0][service].state_dict(), save_dir + service + '.pt')
@@ -211,7 +213,14 @@ def Multi_Process_Optimizing(models: dict[str: MAADModel], optimizers: dict[str:
             # decision_list.append(res)
             # confidence_list.append(res)
             decision_list.append(res.index(max(res)))
-        print(decision_list, error_list)
+        out_str = ""
+        if arguments.labelmode == 0:
+            outstr = [decision_list, error_list]
+        else:
+            outstr = [decision_list, fault]
+        with open("MAADout.txt", 'a+') as f:
+            f.write(outstr)
+            f.write("\n")
         for service in optimizers.keys():
             optimizers[service].step()
             optimizers[service].zero_grad()
@@ -358,7 +367,7 @@ if __name__ == '__main__':
     parser.add_argument("--drain", type=str, default="gaia", help="Name of drain model")
     parser.add_argument("--errortypes", type=int, default=72, help="Number of error types of the datset. The normal type should be the 0 one.")
     parser.add_argument("--fileconfig", type=str, default="2,4,9,10,11,12", help="Six numbers split by ',' to indicate the position of important information servicename, spanid, error code (if the dataset does not have errorcode, write any number is fine.), span event, child list and log list.")
-    
+    parser.add_argument("--train", type=bool, default=True, help="Indicate train or test mode.")
     
     arguments = parser.parse_args()
     pre_config = arguments.fileconfig.split(',')
@@ -369,5 +378,5 @@ if __name__ == '__main__':
     child_pos = pre_config[4]
     log_pos = pre_config[5]
     
-    fault_list = Init_workflow(arguments.faultlist)
+    fault_list = Init_workflow(arguments.faultlist, arguments.train)
     Sample(fault_list=fault_list, arguments=arguments)
