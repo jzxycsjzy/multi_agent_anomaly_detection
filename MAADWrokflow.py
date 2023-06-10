@@ -91,7 +91,7 @@ def Sample(fault_list: dict, arguments):
     optimizers = []
     # Init Models based on batch_size
     for i in range(batch_size):
-        model_dict, optim_dict = Init_model(arguments.servicelist, arguments.errortypes)
+        model_dict, optim_dict = Init_model(arguments.servicelist, arguments.errortypes, arguments.train)
         models.append(model_dict)
         optimizers.append(optim_dict)
     # Init drain clusters
@@ -207,9 +207,10 @@ def Multi_Process_Optimizing(models: dict[str: MAADModel], optimizers: dict[str:
             if arguments.labelmode == 0:
                 fault = error_list[i]
                 tgt = torch.tensor([fault], dtype=torch.long)
-            loss = loss_func(category, tgt)
-            loss = loss / len(lines)
-            loss.backward(retain_graph=True)
+            if arguments.train:
+                loss = loss_func(category, tgt)
+                loss = loss / len(lines)
+                loss.backward(retain_graph=True)
             # decision_list.append(res)
             # confidence_list.append(res)
             decision_list.append(res.index(max(res)))
@@ -221,9 +222,10 @@ def Multi_Process_Optimizing(models: dict[str: MAADModel], optimizers: dict[str:
         with open("MAADout.txt", 'a+') as f:
             f.write(outstr)
             f.write("\n")
-        for service in optimizers.keys():
-            optimizers[service].step()
-            optimizers[service].zero_grad()
+        if arguments.train:
+            for service in optimizers.keys():
+                optimizers[service].step()
+                optimizers[service].zero_grad()
         # print("#;{};{};{}".format(fault_type_0, decision_list, confidence_list))
 
 def WorkTrace(models: dict[str: MAADModel], optimizers: dict[str: Adam], lines: list, fault_list: dict, tmp: TemplateMiner, error_list: list, category_list: list, feature_list: list, label_mode: int):
@@ -387,5 +389,5 @@ if __name__ == '__main__':
     weight4ind = data_io.getWeight(words, word2weight)
     
     
-    fault_list = Init_workflow(arguments.faultlist, arguments.train)
+    fault_list = Init_workflow(arguments.faultlist)
     Sample(fault_list=fault_list, arguments=arguments)
