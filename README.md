@@ -16,7 +16,7 @@ or
 
 Refer to http://docs.aiops.cloudwise.com/en/ to get another dataset.
 ## Quick Start
-Firstly, split the whole dataset into saperated trace file such as example_log.txt and put all these file in a certain file such as "./data/train/". And ensure to generate fault list file such as id_fault.csv and service3 name list such as id_service.csv.
+Firstly, split the whole dataset into saperated trace file such as example_log.txt and put all these file in a certain file such as "./data/train/". Furthermore, if the dataset has trace-level labels, the name of each trace file shoulb be like traceid_faulttype.*. And ensure to generate fault list file such as id_fault.csv and service3 name list such as id_service.csv.
 
 Use workflow_new.py to train multi agents.
 ```python
