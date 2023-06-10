@@ -2,12 +2,7 @@
 ## Environment requirement
 Linux. This system has been tested on Ubuntu 22.04.
 # Python environment
-```
-python==3.7.1
-torch==1.7.0+cu110
-scikit-learn==1.0.2
-```
-or just use the requirements.txt
+Just use the requirements.txt
 # Other Requirement
 Drain3, refer to https://github.com/logpai/Drain3.
 
