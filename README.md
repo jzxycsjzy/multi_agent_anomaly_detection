@@ -1,6 +1,6 @@
 # Multi Agent Anomaly Detection
 ## Environment requirement
-Linux. This system has been tested on Ubuntu 22.04.
+Linux. This system has been tested on Ubuntu 22.04, python3.7.1.
 # Python environment
 Just use the requirements.txt
 # Other Requirement
