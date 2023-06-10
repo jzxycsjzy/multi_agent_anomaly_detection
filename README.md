@@ -20,7 +20,7 @@ Firstly, split the whole dataset into saperated trace file such as example_log.t
 
 Use workflow_new.py to train multi agents.
 ```python
-python MAADWorkflow.py --servicelist id_service.csv --faultlist id_fault.csv --batch 1 --trainset ./data/train/ --labelmode 0 --errortypes 72
+python MAADWorkflow.py --servicelist id_service.csv --faultlist id_fault.csv --batch 1 --trainset ./data/train/ --labelmode 0 --errortypes 72 --train True
 ```
 
 Use SecondTimeClassification.py as the Multi-Decision Merger. 
