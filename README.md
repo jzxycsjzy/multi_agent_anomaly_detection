@@ -23,12 +23,12 @@ Refer to http://docs.aiops.cloudwise.com/en/ to get another dataset.
 ## Quick Start
 Firstly, split the whole dataset into saperated trace file such as example_log.txt and put all these file in a certain file such as "./data/train/". Furthermore, if the dataset has trace-level labels, the name of each trace file shoulb be like traceid_faulttype.* (e.g. 7bf800940ab64c55a70add01ad6b847b.37.16284749994970479_71.csv). And ensure to generate fault list file such as id_fault.csv and service3 name list such as id_service.csv.
 
-Use workflow_new.py to train multi agents.
+Use MAADWorkflow.py to train multi agents.
 ```python
 python MAADWorkflow.py --servicelist id_service.csv --faultlist id_fault.csv --batch 1 --trainset ./data/train/ --labelmode 0 --errortypes 72 --train True
 ```
 
-Use SecondTimeClassification.py as the Multi-Decision Merger. 
+Use Multi=decision_Merger.py as the Multi-Decision Merger. 
 ```python
 python Multi_decision_Merger.py --trainset train.txt --testset test.txt
 ```
