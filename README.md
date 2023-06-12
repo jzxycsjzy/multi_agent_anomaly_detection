@@ -30,7 +30,7 @@ python MAADWorkflow.py --servicelist id_service.csv --faultlist id_fault.csv --b
 
 When the parameter ```train``` is set as False, the program will become inference mod. And the program could generate an MAADout.txt which contains a series of multi-agent confidence lists and its corresponding labels.
 
-Use Multi=decision_Merger.py as the Multi-Decision Merger. 
+Then, use Multi=decision_Merger.py as the Multi-Decision Merger. 
 ```python
 python Multi_decision_Merger.py --trainset MAADout_test.txt
 ```
