@@ -32,5 +32,5 @@ When the parameter ```train``` is set as False, the program will become inferenc
 
 Use Multi=decision_Merger.py as the Multi-Decision Merger. 
 ```python
-python Multi_decision_Merger.py --trainset train.txt --testset test.txt
+python Multi_decision_Merger.py --trainset MAADout_test.txt
 ```
