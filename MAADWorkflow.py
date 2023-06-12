@@ -1,3 +1,7 @@
+"""
+This file is the main workflow progress of MAAD.
+"""
+
 from __future__ import annotations
 from typing import Tuple
 
@@ -47,17 +51,24 @@ param.rmpc = rmpc
 # Set loss function
 loss_func = CrossEntropyLoss()
 
-# Set Pre config
-service_pos = 2
-span_pos = 4
-error_pos = 9
-event_pos = 10
-child_pos = 11
-log_pos = 12
+# Set Pre config, this parameters works when each span information could be split by ','
+service_pos = 2 # indicate the service name position of the current span in the file
+span_pos = 4    # indicate the span id position
+error_pos = 9   # indicate the error type position, if the dataset is trace-level label, this param could be any number.
+event_pos = 10  # indicate the span request position
+child_pos = 11  # indicate the child spans list position, child span ids should be split by ';'
+log_pos = 12    # indicate the log lines list position, log lines should be split by ';'
 
 def Init_model(servicelist: str, error_types: int, isTrain: bool) -> Tuple[dict[str: MAADModel], dict[str: torch.optim.Adam]]:
     """
     Init model from service list. Assign one model for each service
+    
+    Param:
+        servicelist: The name of service list file. such as id_service.csv
+        error_types: The name of fault type file, such as id_fault.csv
+        isTrain: indicate the current workflow is train or test.
+    return:
+        dict of models and corresponding Adam optimizers, such as {"ts-order-service": MAADModel}
     """
     model_list = {}
     optimizer_list = {}
@@ -75,6 +86,12 @@ def Init_model(servicelist: str, error_types: int, isTrain: bool) -> Tuple[dict[
 def Init_workflow(fault_list: str) -> Tuple[list[pd.DataFrame], dict]:
     """
     Init fualt list
+    
+    Param:
+        error_types: The name of fault type file, such as id_fault.csv
+        
+    return:
+        fault dict. such as {"F01-01": 1}
     """
     fault_list = pd.read_csv(fault_list)
     fault_list = fault_list.to_dict()['faultname']
