@@ -70,15 +70,18 @@ def CheckData(file = "res.txt"):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     # Add arguments
-    parser.add_argument("--trainset", type=str, default="train.txt", help="trainset of Multi-decision Merger")
-    parser.add_argument("--testset", type=str, default="test.txt", help="testset of Multi-decision Merger")
+    parser.add_argument("--dataset", type=str, default="MAADout_test.txt", help="dataset of Multi-decision Merger")
+    parser.add_argument("--testset", type=str, default=None, help="pure testset of Multi-decision Merger")
     arguments = parser.parse_args()
     
     data, labels = CheckData(arguments.trainset)
-    train_data, train_label = CheckData(arguments.testset)
+    if arguments.testset != None:
+        train_data, train_label = CheckData(arguments.testset)
     # Split trainset and test set
-    X_train, _, y_train, _ = train_test_split(data, labels, test_size=0.05, random_state=1002)
-    X_test, _, y_test, _ = train_test_split(train_data, train_label, test_size=0.05, random_state=1002)
+        X_train, _, y_train, _ = train_test_split(data, labels, test_size=0.05, random_state=1002)
+        X_test, _, y_test, _ = train_test_split(train_data, train_label, test_size=0.05, random_state=1002)
+    else:
+        X_train, X_test, y_train, y_test = train_test_split(data, labels, test_size=0.3, random_state=1002)
     # Train the model
     clf2 = HistGradientBoostingClassifier(learning_rate=0.05, max_iter=300, l2_regularization=0.2, min_samples_leaf=4, verbose=1, max_leaf_nodes=200, early_stopping=False)
     clf2.fit(X_train, y_train)
