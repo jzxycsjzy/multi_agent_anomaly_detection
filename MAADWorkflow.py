@@ -23,7 +23,7 @@ from torch.optim import Adam
 # Import drain3
 from drain3 import TemplateMiner
 # Import model class
-from model.MAADModel import MAADModel
+from model.MAADModel import MAADAgent
 # Import some tools
 from data_preparation import Drain_Init, RemoveSignals
 
