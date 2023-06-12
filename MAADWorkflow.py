@@ -221,7 +221,8 @@ def Multi_Process_Optimizing(models: dict[str: MAADModel], optimizers: dict[str:
             outstr = [decision_list, error_list]
         else:
             outstr = [decision_list, fault]
-        with open("MAADout.txt", 'a+') as f:
+        outfile_name = "MAADout_train.txt" if arguments.train == True else "MAADout_test.txt"
+        with open(outfile_name, 'a+') as f:
             f.write(outstr)
             f.write("\n")
         if arguments.train:
