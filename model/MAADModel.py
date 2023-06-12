@@ -1,3 +1,6 @@
+"""
+This file define the deep learning model for agents.
+"""
 # Basic lib
 import os
 import numpy as np
@@ -14,7 +17,7 @@ from torch.optim import Adam
 from torch.nn import CrossEntropyLoss
 torch.autograd.set_detect_anomaly(True)
 
-class MAADModel(nn.Module):
+class MAADAgent(nn.Module):
     def __init__(self, error_types: int) -> None:
         super().__init__()
         self.conv1 = nn.Conv2d(1, 1, 3, padding=1)
