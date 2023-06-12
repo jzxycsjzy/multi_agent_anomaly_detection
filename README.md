@@ -2,7 +2,12 @@
 ## Environment requirement
 Linux. This system has been tested on Ubuntu 22.04, python3.7.1.
 # Python environment
-Just use the requirements.txt
+Use the requirements.txt as follow.
+```
+conda create -n MAAD python=3.7
+conda activate MAAD
+pip install -r requirements.txt
+```
 # Other Requirement
 Drain3, refer to https://github.com/logpai/Drain3.
 
