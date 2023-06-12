@@ -76,7 +76,7 @@ def Init_model(servicelist: str, error_types: int, isTrain: bool) -> Tuple[dict[
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     for i in tqdm(range(service_list.shape[0])):
         service = service_list.loc[i]["Service"]
-        model_list[service] = MAADModel(error_types)
+        model_list[service] = MAADAgent(error_types)
         if not isTrain:
             model_list[service].load_state_dict(torch.load("./models/" + service + ".pt"))
         # model_list[service].to(device)
