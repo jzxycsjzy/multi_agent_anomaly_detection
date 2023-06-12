@@ -20,6 +20,8 @@ Please refer to https://github.com/FudanSELab/DeepTraLog to get the dataset.
 or
 
 Refer to http://docs.aiops.cloudwise.com/en/ to get another dataset.
+
+or any other dataset and ensure that the dataset has at least trace data.
 ## Quick Start
 Firstly, split the whole dataset into saperated trace file such as example_log.txt and put all these file in a certain file such as "./data/train/". Furthermore, if the dataset has trace-level labels, the name of each trace file shoulb be like traceid_faulttype.* (e.g. 7bf800940ab64c55a70add01ad6b847b.37.16284749994970479_71.csv). And ensure to generate fault list file such as id_fault.csv and service3 name list such as id_service.csv.
 
