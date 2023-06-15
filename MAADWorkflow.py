@@ -142,7 +142,7 @@ def Sample(fault_list: dict, arguments):
             # fault_type = int(cur_file_list[i].split('_')[1].split('.')[0])
             file = os.path.join(arguments.trainset, cur_file_list[i])
             pd_file_list[batch_count].append(file)
-            if len(pd_file_list[batch_count]) == 100000:
+            if len(pd_file_list[batch_count]) == 10000:
                 args = (models[batch_count], optimizers[batch_count], pd_file_list[batch_count], fault_list, tmp, arguments)
                 args_list.append(args)
                 batch_count += 1
@@ -212,7 +212,7 @@ def Multi_Process_Optimizing(models: dict[str: MAADModel], optimizers: dict[str:
         _, file_name = os.path.split(file)
         fault = 0
         if arguments.labelmode == 0:
-            fault = int(file_name.split('_')[1])
+            fault = int(file_name.split('_')[1].split('.')[0])
         category_list = []
         feature_list = []
         error_list = []
