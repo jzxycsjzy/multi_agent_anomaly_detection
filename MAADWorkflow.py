@@ -315,8 +315,6 @@ def WorkForward(lines: list, models: dict[str: MAADModel], optimizers: dict[str:
     
     cur_vectors = Logs2Vectors(start_log, tmp=tmp)
     cur_span_vectors = Logs2Vectors([start_span], tmp=tmp)
-    if cur_span_vectors == []:
-        return
     cur_tensor = torch.tensor(cur_vectors, dtype=torch.float32) if cur_vectors != [] else None
     if cur_tensor != None:
         cur_tensor = cur_tensor.unsqueeze(0).unsqueeze(0)
