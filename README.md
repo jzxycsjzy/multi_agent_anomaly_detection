@@ -23,7 +23,10 @@ Refer to http://docs.aiops.cloudwise.com/en/ to get another dataset.
 
 or any other dataset and ensure that the dataset has at least trace data.
 ## Quick Start
-Firstly, split the whole dataset into saperated trace file such as example_log.txt and put all these file in a certain file such as "./data/train/". Furthermore, if the dataset has trace-level labels, the name of each trace file shoulb be like traceid_faulttype.* (e.g. 7bf800940ab64c55a70add01ad6b847b.37.16284749994970479_71.csv). And ensure to generate fault list file such as id_fault.csv and service3 name list such as id_service.csv.
+Firstly, prepate the data at first. It is NECESSARY to do the things below at the same time.
+1. Split the whole dataset into saperated trace files, each filename format is traceid_faulttype.* (e.g. 7bf800940ab64c55a70add01ad6b847b.37.16284749994970479_71.csv) and put them into the same folder.
+2. Generate faults list as id_fault.csv and services list as id_service.csv.
+3. Generate drain3 model and use this model to construct corpus to train a GloVe model.
 
 Use MAADWorkflow.py to train multi agents.
 ```python
@@ -32,7 +35,7 @@ python MAADWorkflow.py --servicelist id_service.csv --faultlist id_fault.csv --b
 
 When the parameter ```train``` is set as False, the program will become inference mod. And the program could generate an MAADout.txt which contains a series of multi-agent confidence lists and its corresponding labels.
 
-Then, use Multi=decision_Merger.py as the Multi-Decision Merger. 
+Then, use Multi_decision_Merger.py as the Multi-Decision Merger. 
 ```python
 python Multi_decision_Merger.py --trainset MAADout_test.txt
 ```
