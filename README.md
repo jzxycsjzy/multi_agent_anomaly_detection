@@ -30,7 +30,7 @@ Firstly, prepate the data at first. It is NECESSARY to do the things below at th
 
 Use MAADWorkflow.py to train multi agents.
 ```python
-python MAADWorkflow.py --servicelist id_service.csv --faultlist id_fault.csv --batch 1 --trainset ./data/train/ --labelmode 0 --errortypes 72 --train True
+python MAADWorkflow.py --servicelist id_service.csv --faultlist id_fault.csv --batch 1 --trainset ./data/train/ --labelmode 0 --errortypes 72 --train True --gloveword ./GloVeModel/vectors.txt --glovevec ./GloVeModel/vocab.txt --drain trainticket --fileconfig "4,1,0,6,3,5"
 ```
 
 When the parameter ```train``` is set as False, the program will become inference mod. And the program could generate an MAADout.txt which contains a series of multi-agent confidence lists and its corresponding labels.
