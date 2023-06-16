@@ -1,0 +1,2 @@
+traceid,spanid,parentspan,childspans,service,loginfo,spaninfo
+d0e906e6a65c4190a1de4049fd78badc.41.16272812904900523,d0e906e6a65c4190a1de4049fd78badc.41.16272812904900522.0,-1,0,ts-assurance-service," a.controller.AssuranceController -Get Assurance Type; a.service.AssuranceServiceImpl -find all assurance type success, list size: 1",{GET}/api/v1/assuranceservice/assurances/types
