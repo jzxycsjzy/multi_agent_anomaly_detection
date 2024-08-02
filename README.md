@@ -1,4 +1,5 @@
 # Multi Agent Anomaly Detection
+We propose multi-agent anomaly detection (MAAD), a distributed architecture with lightweight machine learning models for real-time anomaly detection. MAAD deploys an agent on each service of microservices systems When a request triggers a sequence of services, each agent performs local anomaly detection based on its own logs, local context, and information extracted from its parent span service. For more details, please refer to our [IPDPS 2024 paper](https://ieeexplore.ieee.org/abstract/document/10579128).
 ## Environment requirement
 Linux. This system has been tested on Ubuntu 22.04, python3.7.1.
 # Python environment
